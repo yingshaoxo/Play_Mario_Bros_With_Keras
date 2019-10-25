@@ -24,17 +24,16 @@ else:
     model = generate_complex_model()
 
 
-def train_once(last_state, history_actions, history_x_pos, history_y_pos, action, reward):
+def train_once(last_state, history_actions, history_x_pos, history_y_pos, action):
     global model
     model.train_on_batch(
         x={
-            'action': np.expand_dims(action, axis=0),
             'img': np.expand_dims(last_state, axis=0),
-            'history_action': np.expand_dims(np.array(history_actions), axis=0),
-            'history_x_position': np.expand_dims(np.array(history_x_pos), axis=0),
-            'history_y_position': np.expand_dims(np.array(history_y_pos), axis=0),
+            'action': np.expand_dims(np.array(history_actions), axis=0),
+            'x_position': np.expand_dims(np.array(history_x_pos), axis=0),
+            'y_position': np.expand_dims(np.array(history_y_pos), axis=0),
         },
-        y=np.expand_dims(reward, axis=0)
+        y=identity[action: action+1]
     )
 
 
@@ -61,7 +60,7 @@ random_ration = 0.1
 
 history_rewards = []
 while 1:
-    # random_ration = 1000/training_couting
+    #random_ration = 1000/training_couting
 
     #####################
     # ACTION TAKING
@@ -72,19 +71,14 @@ while 1:
     else:  # prediction by experience
         if isinstance(state, (np.ndarray, np.generic)):
             if len(history_actions) >= 101 and len(history_x_pos) >= 101 and len(history_y_pos) >= 101:
+                action = np.argmax(model.predict({
+                    'img': np.expand_dims(state, axis=0),
+                    'action': np.expand_dims(np.array(history_actions[-100:]), axis=0),
+                    'x_position': np.expand_dims(np.array(history_x_pos[-100:]), axis=0),
+                    'y_position': np.expand_dims(np.array(history_y_pos[-100:]), axis=0),
+                }))
                 print(f"                            |  predict  |  ")
                 print(f"x_pos: {info['x_pos']}  |  reward: {reward}")
-                all_possibility = []
-                for each_action in range(len(SIMPLE_MOVEMENT)):
-                    result = np.argmax(model.predict({
-                        'action': np.expand_dims(each_action, axis=0),
-                        'img': np.expand_dims(state, axis=0),
-                        'history_action': np.expand_dims(np.array(history_actions[-100:]), axis=0),
-                        'history_x_position': np.expand_dims(np.array(history_x_pos[-100:]), axis=0),
-                        'history_y_position': np.expand_dims(np.array(history_y_pos[-100:]), axis=0),
-                    }))
-                    all_possibility.append(result)
-                action = np.argmax(all_possibility)
 
     if len(history_rewards) > 0 and (list(map(lambda x: x == 0 or x == -1, history_rewards)).count(True))/len(history_rewards) > 0.8:  # jump when stuck at the same place too long
         if isinstance(state, (np.ndarray, np.generic)) and info != None:
@@ -107,7 +101,7 @@ while 1:
                 io.write_settings("training_couting", int(training_couting))
 
                 print(f"                                            learning happend with action: {SIMPLE_MOVEMENT[action]}")
-                train_once(last_state, history_actions[-101:-1], history_x_pos[-101:-1], history_y_pos[-101:-1], action, reward)
+                train_once(last_state, history_actions[-101:-1], history_x_pos[-101:-1], history_y_pos[-101:-1], action)
 
         temp = 15
         while 1:
@@ -131,7 +125,7 @@ while 1:
                     io.write_settings("training_couting", int(training_couting))
 
                     print(f"                                            learning happend with action: {SIMPLE_MOVEMENT[action]}")
-                    train_once(last_state, history_actions[-101:-1], history_x_pos[-101:-1], history_y_pos[-101:-1], action, reward)
+                    train_once(last_state, history_actions[-101:-1], history_x_pos[-101:-1], history_y_pos[-101:-1], action)
 
             if done:
                 env.reset()
@@ -141,7 +135,7 @@ while 1:
                 break
 
         if (len(history_rewards)) > 300:
-            history_rewards = []
+                history_rewards = []
 
     #####################
     # Do it!
@@ -177,14 +171,14 @@ while 1:
     #####################
     # Think about it!
     ####################
-    if reward != 0:
+    if (reward > 0):
         if isinstance(last_state, (np.ndarray, np.generic)):
             if len(history_actions) >= 101 and len(history_x_pos) >= 101 and len(history_y_pos) >= 101:
                 training_couting += 1
                 io.write_settings("training_couting", int(training_couting))
 
                 print(f"                                            learning happend with action: {SIMPLE_MOVEMENT[action]}")
-                train_once(last_state, history_actions[-101:-1], history_x_pos[-101:-1], history_y_pos[-101:-1], action, reward)
+                train_once(last_state, history_actions[-101:-1], history_x_pos[-101:-1], history_y_pos[-101:-1], action)
 
     #####################
     # Save progress
