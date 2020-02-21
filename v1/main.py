@@ -1,75 +1,183 @@
-from model import generate_model
+from model import generate_complex_model
 import tensorflow as tf
 import os
 import numpy as np
-from random import randint
+
+from config import HISTORY_LENGTH
+
+import time
+import random
 from nes_py.wrappers import JoypadSpace
 import gym_super_mario_bros
-#from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
-import time
-from auto_everything.base import IO
-io = IO()
 
 env = gym_super_mario_bros.make('SuperMarioBros-v2')
 env = JoypadSpace(env,  SIMPLE_MOVEMENT)
-
+env.reset()
 
 model_file_path = './nn_model.HDF5'
 final_model_file_path = './final_nn_model.HDF5'
 if os.path.exists(model_file_path):
     model = tf.keras.models.load_model(model_file_path)
 else:
-    model = generate_model()
+    model = generate_complex_model()
 
-# env.action_space.sample() = numbers, for example, 0,1,2,3...
-# state = RGB of raw picture; is a numpy array with shape (240, 256, 3)
-# reward = int; for example, 0, 1 ,2, ...
-# done = False or True
-# info = {'coins': 0, 'flag_get': False, 'life': 3, 'score': 0, 'stage': 1, 'status': 'small', 'time': 400, 'world': 1, 'x_pos': 40}
 
-done = True
-last_state = None
 identity = np.identity(env.action_space.n)  # for quickly get a hot vector, like 0001000000000000
 
-x_pos = 0
-max_x_pos = io.read_settings("max_x_pos", 0)
-life = 2
-perfect_model = model
+
+def one_element_of_history_array_to_vector(one_element_of_history_array):
+    vector = []
+    for item in one_element_of_history_array:
+        value = item["value"]
+        times = item["times"]
+        vector.append(value)
+        vector.append(times)
+    return vector
+
+
+def train_once(history_x_position, history_y_position, history_action, image, action):
+    global model
+
+    history_x_position = one_element_of_history_array_to_vector(history_x_position)
+    history_y_position = one_element_of_history_array_to_vector(history_y_position)
+    history_action = one_element_of_history_array_to_vector(history_action)
+
+    action = identity[action: action+1]
+
+    model.train_on_batch(
+        x={
+            'history_x_position': np.expand_dims(np.array(history_x_position), axis=0),
+            'history_y_position': np.expand_dims(np.array(history_y_position), axis=0),
+            'history_action': np.expand_dims(np.array(history_action), axis=0),
+            'image': np.expand_dims(image, axis=0),
+        },
+        y=action,
+    )
+
+
+def predict_once(history_x_position, history_y_position, history_action, image):
+    global model
+
+    history_x_position = one_element_of_history_array_to_vector(history_x_position)
+    history_y_position = one_element_of_history_array_to_vector(history_y_position)
+    history_action = one_element_of_history_array_to_vector(history_action)
+
+    result = model.predict({
+        'history_x_position': np.expand_dims(np.array(history_x_position), axis=0),
+        'history_y_position': np.expand_dims(np.array(history_y_position), axis=0),
+        'history_action': np.expand_dims(np.array(history_action), axis=0),
+        'image': np.expand_dims(image, axis=0),
+    })
+
+    result = np.argmax(result)
+    print(SIMPLE_MOVEMENT[result])
+    return result
+
+
+identity = np.identity(env.action_space.n)  # for quickly get a hot vector, like 0001000000000000
+
+image = None
+reward = 0
+done = None
+info = None
+action = 0
+
+last_image = None
+
+random_ration = 0.1
+
+history_x_position = []
+history_y_position = []
+history_action = []
+history_image = []
+
 while 1:
-    model = perfect_model
+    #####################
+    # FIND A WAY
+    ####################
+    if random_ration > random.random():
+        # take action randomly
+        action = env.action_space.sample()
+    else:
+        # take action based on prediction
+        if isinstance(image, (np.ndarray, np.generic)):
+            if len(history_x_position) >= HISTORY_LENGTH and len(history_y_position) >= HISTORY_LENGTH and len(history_action) >= HISTORY_LENGTH:
+                action = predict_once(history_x_position, history_y_position, history_action, image)
 
-    for step in range(1000):
-        if done:
-            state = env.reset()
+    #####################
+    # TAKE ACTION
+    ####################
+    last_image = image
+    image, reward, done, info = env.step(action)
+    env.render()
 
-        if randint(1, 10) == 1 or not isinstance(last_state, (np.ndarray, np.generic)):
-            action = env.action_space.sample()
+    # update history data
+    if len(history_action) == 0:
+        history_action.append({"value": action, "times": 0})
+    else:
+        if action == history_action[-1]['value']:
+            history_action[-1]["times"] += 1
         else:
-            action = np.argmax(model.predict(np.expand_dims(last_state, axis=0)))
-            # print(action)
+            history_action.append({"value": action, "times": 0})
+        history_action = history_action[-HISTORY_LENGTH:]
 
-        state, reward, done, info = env.step(action)
-        last_state = state
-        if reward > 1 and x_pos > max_x_pos:
-            model.train_on_batch(x=np.expand_dims(last_state, axis=0), y=identity[action: action+1])
-            print(f"training happens: {reward}\nx_pos:{info['x_pos']}")
+    if len(history_x_position) == 0:
+        history_x_position.append({"value": info['x_pos'], "times": 0})
+    else:
+        if info['x_pos'] == history_x_position[-1]['value']:
+            history_x_position[-1]["times"] += 1
+        else:
+            history_x_position.append({"value": info["x_pos"], "times": 0})
+        history_x_position = history_x_position[-HISTORY_LENGTH:]
 
-        env.render()
+    if len(history_y_position) == 0:
+        history_y_position.append({"value": info['y_pos'], "times": 0})
+    else:
+        if info['y_pos'] == history_y_position[-1]['value']:
+            history_y_position[-1]["times"] += 1
+        else:
+            history_y_position.append({"value": info["y_pos"], "times": 0})
+        history_y_position = history_y_position[-HISTORY_LENGTH:]
 
-        x_pos = info["x_pos"]
-        if x_pos > max_x_pos:
-            max_x_pos = x_pos
-            io.write_settings("max_x_pos", int(max_x_pos))
-            if info["life"] == 2:
-                perfect_model = model
-                model.save(model_file_path)
-        if info["stage"] == 2:
-            io.write_settings("max_x_pos", int(max_x_pos))
-            model.save(final_model_file_path)
-            input("congraduations!")
-            exit()
+    if len(history_image) == 0:
+        history_image.append({"value": image.copy(), "times": 0})
+    else:
+        if np.array_equal(image.copy(), history_image[-1]['value']):
+            history_image[-1]["times"] += 1
+        else:
+            history_image.append({"value": image.copy(), "times": 0})
+        history_image = history_image[-HISTORY_LENGTH:]
 
-        life = info["life"]
+    if done or reward < -5:
+        # you died, sorry
+        env.reset()
 
-env.close()
+        history_x_position = []
+        history_y_position = []
+        history_action = []
+        history_image = []
+
+    #####################
+    # THINK ABOUT IT
+    ####################
+    #if reward != 0:
+    #    if isinstance(last_image, (np.ndarray, np.generic)):
+    #        if len(history_x_position) >= HISTORY_LENGTH and len(history_y_position) >= HISTORY_LENGTH and len(history_action) >= HISTORY_LENGTH:
+    #            train_once(history_x_position, history_y_position, history_action, image, action)
+
+    #####################
+    # SAVE PROGRESS
+    ####################
+    # if info['x_pos'] > max_x_pos:
+    #    differ = abs(info['x_pos'] - max_x_pos)
+    #    if differ > 200:
+    #        max_x_pos = info['x_pos']
+    #        io.write_settings("max_x_pos", int(max_x_pos))
+    #        if info['life'] == 2:
+    #            model.save(model_file_path)
+
+    # if info["stage"] == 2:
+    #    model.save(final_model_file_path)
+    #    input("congraduations!")
+    #    exit()
