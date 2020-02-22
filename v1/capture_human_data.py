@@ -1,4 +1,5 @@
 from config import HISTORY_LENGTH
+
 import pickle
 import keyboard
 import numpy as np
