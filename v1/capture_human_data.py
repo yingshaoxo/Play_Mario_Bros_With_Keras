@@ -1,21 +1,23 @@
-from config import HISTORY_LENGTH
+from config import HISTORY_LENGTH  # it's a local py file: config.py
+from config import MY_MOVEMENT  # it's a local py file: config.py
 
 import pickle
 import keyboard
 import numpy as np
 from nes_py.wrappers import JoypadSpace
 import gym_super_mario_bros
-from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+#from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 from pprint import pprint
 env = gym_super_mario_bros.make('SuperMarioBros-v2')
-env = JoypadSpace(env, SIMPLE_MOVEMENT)
+env = JoypadSpace(env, MY_MOVEMENT)
 
 
 print("""
-SIMPLE_MOVEMENT = [
+MOVEMENT = [
     ['NOOP'],
     ['right'],
     ['right', 'A'],
+
     ['right', 'B'],
     ['right', 'A', 'B'],
     ['A'],
@@ -132,7 +134,7 @@ def print_array():
     RUN = False
 
 
-for num in range(0, 7):
+for num in range(0, len(MY_MOVEMENT)):
     keyboard.add_hotkey(str(num), step, args=(num, ))
 keyboard.add_hotkey("ctrl+shift+esc", print_array)
 

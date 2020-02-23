@@ -1,4 +1,5 @@
-from config import HISTORY_LENGTH, HISTORY_LEVEL
+from config import HISTORY_LENGTH, HISTORY_LEVEL  # it's a local py file: config.py
+from config import MY_MOVEMENT  # it's a local py file: config.py
 from model import generate_complex_model
 
 
@@ -12,10 +13,11 @@ from pprint import pprint
 import random
 from nes_py.wrappers import JoypadSpace
 import gym_super_mario_bros
-from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+#from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+
 
 env = gym_super_mario_bros.make('SuperMarioBros-v2')
-env = JoypadSpace(env,  SIMPLE_MOVEMENT)
+env = JoypadSpace(env,  MY_MOVEMENT)
 env.reset()
 
 model_file_path = './nn_model.HDF5'
@@ -35,10 +37,11 @@ info = None
 action = 0
 
 last_image = None
+max_distance = 0
 
 initial_flag = True
-#random_ration = 0.1 # use it when doing RL
-random_ration = 0.0 # you can use this to see how well the supervised model does
+#random_ration = 0.1  # use it when doing RL
+random_ration = 0.0  # you can use this to see how well the supervised model does
 
 history_x_position = []
 history_y_position = []
@@ -87,12 +90,14 @@ def predict_once(history_x_position, history_y_position, history_action, history
     })
 
     result = np.argmax(result)
-    print(SIMPLE_MOVEMENT[result])
+    print(MY_MOVEMENT[result])
     return result
 
 
 def train_once(history_x_position, history_y_position, history_action, history_image, image, action):
     global model
+
+    print(" "*30 + f"training happend")
 
     history_x_position = one_element_of_history_array_to_vector(history_x_position)
     history_y_position = one_element_of_history_array_to_vector(history_y_position)
@@ -124,13 +129,6 @@ def manage_history_array(how=None):
         history_image_array = history_image_array[-HISTORY_LENGTH*HISTORY_LEVEL:]
         image_array = image_array[-HISTORY_LENGTH*HISTORY_LEVEL:]
         action_array = action_array[-HISTORY_LENGTH*HISTORY_LEVEL:]
-    elif how == "refresh":
-        history_x_position_array = history_x_position_array[HISTORY_LENGTH:]
-        history_y_position_array = history_y_position_array[HISTORY_LENGTH:]
-        history_action_array = history_action_array[HISTORY_LENGTH:]
-        history_image_array = history_image_array[HISTORY_LENGTH:]
-        image_array = image_array[HISTORY_LENGTH:]
-        action_array = action_array[HISTORY_LENGTH:]
     elif how == "reset":
         history_x_position_array = []
         history_y_position_array = []
@@ -141,56 +139,40 @@ def manage_history_array(how=None):
 
 
 def train_array(history_x_position_array, history_y_position_array, history_action_array, history_image_array, image_array, action_array):
-    manage_history_array("update")
+    if len(history_x_position_array) > HISTORY_LENGTH*HISTORY_LEVEL and len(history_y_position_array) > HISTORY_LENGTH*HISTORY_LEVEL and len(history_action_array) > HISTORY_LENGTH*HISTORY_LEVEL and len(history_image_array) > HISTORY_LENGTH*HISTORY_LEVEL and len(image_array) > HISTORY_LENGTH*HISTORY_LEVEL and len(action_array) > HISTORY_LENGTH*HISTORY_LEVEL:
+        for index, _ in enumerate(action_array):
+            history_x_position = history_x_position_array[index]
+            history_y_position = history_y_position_array[index]
+            history_action = history_action_array[index]
+            history_image = history_image_array[index]
+            image = image_array[index]
+            action = action_array[index]
 
-    if len(history_x_position_array) >= HISTORY_LENGTH*HISTORY_LEVEL and len(history_y_position_array) >= HISTORY_LENGTH*HISTORY_LEVEL and len(history_action_array) >= HISTORY_LENGTH*HISTORY_LEVEL and len(history_image_array) >= HISTORY_LENGTH*HISTORY_LEVEL and len(image_array) >= HISTORY_LENGTH*HISTORY_LEVEL and len(action_array) >= HISTORY_LENGTH*HISTORY_LEVEL:
-        print(" "*30 + f"training happend")
-
-        #for index, _ in enumerate(action_array):
-        #    if index <= HISTORY_LENGTH:
-        #        history_x_position = history_x_position_array[index]
-        #        history_y_position = history_y_position_array[index]
-        #        history_action = history_action_array[index]
-        #        history_image = history_image_array[index]
-        #        image = image_array[index]
-        #        action = action_array[index]
-
-        #        train_once(history_x_position, history_y_position, history_action, history_image, image, action)
-
-        #manage_history_array("refresh")
-
-        history_x_position = history_x_position_array[0]
-        history_y_position = history_y_position_array[0]
-        history_action = history_action_array[0]
-        history_image = history_image_array[0]
-        image = image_array[0]
-        action = action_array[0]
-
-        train_once(history_x_position, history_y_position, history_action, history_image, image, action)
+            if (history_x_position[-1]['value'] - history_x_position[0]['value']) > HISTORY_LENGTH//2:
+                train_once(history_x_position, history_y_position, history_action, history_image, image, action)
 
 
 while 1:
     #####################
     # FIND A WAY
     ####################
-    # take action based on prediction
-    if isinstance(image, (np.ndarray, np.generic)):
-        if len(history_x_position) >= HISTORY_LENGTH and len(history_y_position) >= HISTORY_LENGTH and len(history_action) >= HISTORY_LENGTH and len(history_image) >= HISTORY_LENGTH:
-            action = predict_once(history_x_position, history_y_position, history_action, history_image, image)
+    if random_ration > random.random():
+        # take action randomly
+        action = env.action_space.sample()
+    else:
+        # try to take action based on prediction
+        if isinstance(image, (np.ndarray, np.generic)):
+            if len(history_x_position) >= HISTORY_LENGTH and len(history_y_position) >= HISTORY_LENGTH and len(history_action) >= HISTORY_LENGTH and len(history_image) >= HISTORY_LENGTH:
+                # take action based on prediction
+                action = predict_once(history_x_position, history_y_position, history_action, history_image, image)
+            else:
+                # take action randomly
+                action = env.action_space.sample()
         else:
             # take action randomly
             action = env.action_space.sample()
-    else:
-        # take action randomly
-        action = env.action_space.sample()
-
 
     if len(history_x_position) >= HISTORY_LENGTH and len(history_y_position) >= HISTORY_LENGTH and len(history_action) >= HISTORY_LENGTH and len(history_image) >= HISTORY_LENGTH:
-        # preventing agent learn anything from the initial random actions
-        # if initial_flag == True:
-        #    manage_history_array("reset")
-        #    initial_flag = False
-
         image_array.append(image.copy())
         history_action_array.append(history_action.copy())
         history_x_position_array.append(history_x_position.copy())
@@ -253,32 +235,24 @@ while 1:
 
         manage_history_array("reset")
 
-        # preventing agent learn anything from the initial random actions
-        #initial_flag = True
-
     #####################
     # THINK ABOUT IT
     ####################
-    #if reward >= 0:
+    #current_distance = info['x_pos']
+    #progress = current_distance - max_distance
+    #if progress > HISTORY_LENGTH*HISTORY_LEVEL:
+    #    max_distance = current_distance
+
     #    # We should think about a strategy to make sure we train it with right data
-    #    # Like split history to levels: if we live, for an experience, the older, the better
+    #    # Like split history to levels: if we live, for the experience we have, the older, the better
     #    if isinstance(last_image, (np.ndarray, np.generic)):
     #        if len(history_x_position) >= HISTORY_LENGTH and len(history_y_position) >= HISTORY_LENGTH and len(history_action) >= HISTORY_LENGTH and len(history_image) >= HISTORY_LENGTH:
-    #            #train_once(history_x_position, history_y_position, history_action, history_image, image, action)
     #            train_array(history_x_position_array, history_y_position_array, history_action_array, history_image_array, image_array, action_array)
 
     #####################
     # SAVE PROGRESS
     ####################
-    # if info['x_pos'] > max_x_pos:
-    #    differ = abs(info['x_pos'] - max_x_pos)
-    #    if differ > 200:
-    #        max_x_pos = info['x_pos']
-    #        io.write_settings("max_x_pos", int(max_x_pos))
-    #        if info['life'] == 2:
-    #            model.save(model_file_path)
-
-    # if info["stage"] == 2:
-    #    model.save(final_model_file_path)
-    #    input("congraduations!")
-    #    exit()
+    if info["stage"] == 2:
+        model.save(final_model_file_path)
+        input("congraduations!")
+        exit()
