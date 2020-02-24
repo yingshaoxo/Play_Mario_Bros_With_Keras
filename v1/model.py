@@ -30,8 +30,7 @@ def generate_model():
 
 def generate_complex_model():
     history_x_location_inputs = keras.Input(shape=(HISTORY_LENGTH*2, ), name="history_x_position")
-    history_x_location_x = keras.layers.BatchNormalization()(history_x_location_inputs)
-    history_x_location_x = keras.layers.Dense(16, activation="relu")(history_x_location_x)
+    history_x_location_x = keras.layers.Dense(16, activation="relu")(history_x_location_inputs)
     history_x_location_x = keras.layers.Dropout(0.2)(history_x_location_x)
     history_x_location_x = keras.layers.Dense(8, activation="relu")(history_x_location_x)
     history_x_location_x = keras.layers.Dropout(0.2)(history_x_location_x)
