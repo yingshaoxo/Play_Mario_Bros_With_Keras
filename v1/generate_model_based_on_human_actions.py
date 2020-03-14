@@ -76,7 +76,7 @@ for index, _ in enumerate(image_array):
     array_action.append(action)
 
 
-for current_epoch in range(epochs+1):
+for current_epoch in range(epochs):
     model.fit(
         x={
             'history_x_position': np.array(array_history_x_position),

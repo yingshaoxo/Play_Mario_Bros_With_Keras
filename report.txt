@@ -1,0 +1,21 @@
+TensorFlow 2.0 Upgrade Script
+-----------------------------
+Converted 1 files
+Detected 0 issues that require attention
+--------------------------------------------------------------------------------
+================================================================================
+Detailed log follows:
+
+================================================================================
+--------------------------------------------------------------------------------
+Processing file 'test.py'
+ outputting to 'hi.py'
+--------------------------------------------------------------------------------
+
+28:24: INFO: Renamed 'tf.random_uniform' to 'tf.random.uniform'
+29:49: INFO: Added keywords to args of function 'tf.transpose'
+30:24: INFO: Added keywords to args of function 'tf.reduce_sum'
+34:9: INFO: Renamed 'tf.Session' to 'tf.compat.v1.Session'
+34:27: INFO: Renamed 'tf.ConfigProto' to 'tf.compat.v1.ConfigProto'
+--------------------------------------------------------------------------------
+
