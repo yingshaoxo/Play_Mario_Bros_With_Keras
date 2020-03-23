@@ -1,3 +1,4 @@
+video/
 *.h5f
 nn_model/
 *.HDF5
